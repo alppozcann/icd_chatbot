@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ICD-10 RAG Demo</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; max-width: 900px; }
+    h1 { margin: 0 0 8px; }
+    .muted { color: #666; margin-bottom: 16px; }
+    textarea { width: 100%; min-height: 120px; padding: 12px; font-size: 14px; }
+    .row { display: flex; gap: 12px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+    button { padding: 10px 14px; font-size: 14px; cursor: pointer; }
+    input[type="number"] { width: 80px; padding: 8px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin-top: 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #f7f7f7; padding: 10px; border-radius: 8px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 14px; }
+    th { background: #fafafa; }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>ICD-10 Kod Öneri (RAG + DeepSeek)</h1>
+  <div class="muted">FastAPI: <code>http://127.0.0.1:8001</code> • Ollama: <code>http://127.0.0.1:11434</code></div>
+
+  <label for="note"><b>Doktor notu / semptom</b></label>
+  <textarea id="note" placeholder="Örn: 2 haftadır öksürük, ateş, balgam. Pnömoni şüphesi..."></textarea>
+
+  <div class="row">
+    <label>Top-K:
+      <input id="topk" type="number" min="3" max="30" value="10" />
+    </label>
+    <button id="send">Kod öner</button>
+    <span id="status" class="muted"></span>
+  </div>
+
+  <div id="err" class="error"></div>
+
+  <div class="card">
+    <b>RAG adayları (FAISS sonuçları)</b>
+    <div id="cands"></div>
+  </div>
+
+  <div class="card">
+    <b>LLM seçimi (DeepSeek)</b>
+    <pre id="llm"></pre>
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:8001";
+
+    function escapeHtml(s) {
+      return (s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+    }
+
+    async function suggest() {
+      const note = document.getElementById("note").value.trim();
+      const top_k = Number(document.getElementById("topk").value || 10);
+      const status = document.getElementById("status");
+      const err = document.getElementById("err");
+      const cands = document.getElementById("cands");
+      const llm = document.getElementById("llm");
+
+      err.textContent = "";
+      cands.innerHTML = "";
+      llm.textContent = "";
+      if (!note) { err.textContent = "Not boş olamaz."; return; }
+
+      status.textContent = "İstek gönderiliyor...";
+      try {
+        const res = await fetch(`${API}/icd-suggest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note, top_k })
+        });
+
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(`API hata: ${res.status} ${t}`);
+        }
+
+        const data = await res.json();
+
+        // candidates table
+        const rows = (data.candidates || []).map(c =>
+          `<tr>
+            <td><code>${escapeHtml(c.code)}</code></td>
+            <td>${escapeHtml(c.title)}</td>
+            <td>${(c.score ?? 0).toFixed(3)}</td>
+          </tr>`
+        ).join("");
+
+        cands.innerHTML = `
+          <table>
+            <thead><tr><th>Kod</th><th>Başlık</th><th>Skor</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+
+        llm.textContent = data.llm || "";
+        status.textContent = "Tamam ✅";
+      } catch (e) {
+        err.textContent = e.message || String(e);
+        status.textContent = "";
+      }
+    }
+
+    document.getElementById("send").addEventListener("click", suggest);
+  </script>
+</body>
+</html>

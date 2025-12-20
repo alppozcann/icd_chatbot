@@ -1,0 +1,5 @@
+.venv
+__pycache__/
+icd102019enMeta/
+icd10.faiss
+icd10_meta.json
