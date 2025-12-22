@@ -7,6 +7,9 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from fastapi.middleware.cors import CORSMiddleware
 
+
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,8 +23,6 @@ META_PATH  = "icd10_meta.json"
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "deepseek-r1:1.5b"
-
-app = FastAPI()
 
 index = faiss.read_index(INDEX_PATH)
 meta = json.load(open(META_PATH, "r", encoding="utf-8"))

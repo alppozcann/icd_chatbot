@@ -1,73 +1,407 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ICD-10 RAG Demo</title>
+  <title>ICD-10 Coding Assistant</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; max-width: 900px; }
-    h1 { margin: 0 0 8px; }
-    .muted { color: #666; margin-bottom: 16px; }
-    textarea { width: 100%; min-height: 120px; padding: 12px; font-size: 14px; }
-    .row { display: flex; gap: 12px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
-    button { padding: 10px 14px; font-size: 14px; cursor: pointer; }
-    input[type="number"] { width: 80px; padding: 8px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin-top: 12px; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #f7f7f7; padding: 10px; border-radius: 8px; overflow: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 14px; }
-    th { background: #fafafa; }
-    .error { color: #b00020; }
+    :root {
+      --bg: #f4f2ee;
+      --card: #ffffff;
+      --ink: #1e1b16;
+      --muted: #6c665f;
+      --accent: #1b6a5e;
+      --accent-2: #0f3f37;
+      --border: #e6e0d9;
+      --danger: #a01818;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% 0%, #efe8df 0%, transparent 55%),
+        radial-gradient(1000px 500px at 90% 10%, #e6efe9 0%, transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 32px 20px 8px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0 auto;
+      max-width: 640px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 12px 20px 40px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 1.2rem;
+    }
+
+    .input-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font-size: 1rem;
+      background: #fffdfb;
+      color: var(--ink);
+      resize: vertical;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .slider-wrap {
+      flex: 1 1 220px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8f4ef;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 22px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(27, 106, 94, 0.25);
+    }
+
+    .primary:disabled {
+      background: #9bbab5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .ghost {
+      background: transparent;
+      color: var(--accent-2);
+      border: 1px solid var(--border);
+    }
+
+    .results {
+      display: grid;
+      gap: 20px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fffdfb;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 520px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 0.95rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #f7f1ea;
+      font-weight: 600;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .alert {
+      background: #fbecec;
+      color: var(--danger);
+      border: 1px solid #f0b8b8;
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-top: 12px;
+    }
+
+    .suggestion {
+      display: grid;
+      gap: 12px;
+    }
+
+    .suggestion .code {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #e6f1ee;
+      color: var(--accent-2);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      border: 1px solid #c8dcd7;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    .hidden { display: none; }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      padding: 16px 0 32px;
+      font-size: 0.85rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (min-width: 860px) {
+      .input-grid {
+        grid-template-columns: 1.4fr 0.6fr;
+        align-items: start;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>ICD-10 Kod Öneri (RAG + DeepSeek)</h1>
-  <div class="muted">FastAPI: <code>http://127.0.0.1:8001</code> • Ollama: <code>http://127.0.0.1:11434</code></div>
+  <header>
+    <h1>ICD-10 Coding Assistant</h1>
+    <p>Paste a doctor note, tune the retrieval depth, and receive the top ICD-10 candidates plus a structured suggestion.</p>
+  </header>
 
-  <label for="note"><b>Doktor notu / semptom</b></label>
-  <textarea id="note" placeholder="Örn: 2 haftadır öksürük, ateş, balgam. Pnömoni şüphesi..."></textarea>
+  <main class="container">
+    <section class="card">
+      <h2>Doctor note</h2>
+      <div class="input-grid">
+        <div>
+          <textarea id="note" placeholder="Example: 2 weeks of cough, fever, productive sputum. Possible pneumonia."></textarea>
+          <div class="muted" style="margin-top: 8px;">The note is embedded and used to retrieve the most relevant ICD-10 entries.</div>
+        </div>
+        <div class="card" style="background:#fbf7f2; box-shadow:none; border-style:dashed;">
+          <div class="slider-wrap">
+            <label for="topk" class="muted">Number of candidates</label>
+            <input id="topk" type="range" min="3" max="20" value="10" />
+            <div class="pill" aria-live="polite"> <span id="topkValue">10</span></div>
+          </div>
+          <div style="margin-top: 16px;">
+            <button id="send" class="primary">Suggest ICD Code</button>
+          </div>
+          <div id="status" class="muted" style="margin-top: 10px;"></div>
+        </div>
+      </div>
+      <div id="err" class="alert hidden" role="alert"></div>
+    </section>
 
-  <div class="row">
-    <label>Top-K:
-      <input id="topk" type="number" min="3" max="30" value="10" />
-    </label>
-    <button id="send">Kod öner</button>
-    <span id="status" class="muted"></span>
-  </div>
+    <section class="results">
+      <div class="card">
+        <h2>Top Candidates</h2>
+        <div id="cands" class="table-wrap"></div>
+      </div>
 
-  <div id="err" class="error"></div>
+      <div class="card">
+        <h2>Final Suggestion</h2>
+        <div id="final" class="suggestion">
+          <div class="muted">No suggestion yet.</div>
+        </div>
+      </div>
+    </section>
+  </main>
 
-  <div class="card">
-    <b>RAG adayları (FAISS sonuçları)</b>
-    <div id="cands"></div>
-  </div>
-
-  <div class="card">
-    <b>LLM seçimi (DeepSeek)</b>
-    <pre id="llm"></pre>
-  </div>
+  <footer>FastAPI: http://127.0.0.1:8001 • Ollama: http://127.0.0.1:11434</footer>
 
   <script>
     const API = "http://127.0.0.1:8001";
 
     function escapeHtml(s) {
-      return (s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+      return (s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function setLoading(isLoading) {
+      const btn = document.getElementById("send");
+      const status = document.getElementById("status");
+      if (isLoading) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>Working...';
+        status.textContent = "Analyzing note...";
+      } else {
+        btn.disabled = false;
+        btn.textContent = "Suggest ICD Code";
+        status.textContent = "";
+      }
+    }
+
+    function renderCandidates(candidates) {
+      const cands = document.getElementById("cands");
+      if (!candidates || candidates.length === 0) {
+        cands.innerHTML = '<div class="muted" style="padding:12px;">No candidates found.</div>';
+        return;
+      }
+
+      const rows = candidates.map((c, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><code>${escapeHtml(c.code)}</code></td>
+          <td>${escapeHtml(c.title)}</td>
+          <td>${Number(c.score ?? 0).toFixed(3)}</td>
+        </tr>
+      `).join("");
+
+      cands.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Code</th>
+              <th>Title</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderFinal(llmText) {
+      const final = document.getElementById("final");
+      let parsed = null;
+
+      try {
+        parsed = JSON.parse(llmText);
+      } catch (err) {
+        parsed = null;
+      }
+
+      if (!parsed || typeof parsed !== "object") {
+        final.innerHTML = `
+          <div class="muted">Raw model output</div>
+          <pre style="white-space:pre-wrap; background:#fbf7f2; padding:12px; border-radius:10px; border:1px solid var(--border);">${escapeHtml(llmText || "")}</pre>
+        `;
+        return;
+      }
+
+      const primary = escapeHtml(parsed.primary_code || "-");
+      const confidence = parsed.confidence != null ? Number(parsed.confidence).toFixed(2) : "-";
+      const reason = escapeHtml(parsed.reason || "");
+      const alternatives = Array.isArray(parsed.alternatives) ? parsed.alternatives : [];
+      const altList = alternatives.map((alt) => `
+        <li><code>${escapeHtml(alt.code || "")}</code> — ${escapeHtml(alt.why || "")}</li>
+      `).join("");
+
+      final.innerHTML = `
+        <div class="code">${primary}</div>
+        <div class="badge">Confidence: ${confidence}</div>
+        <div>${reason}</div>
+        <button id="copyBtn" class="ghost" type="button">Copy primary code</button>
+        ${altList ? `<div><strong>Alternatives</strong><ul>${altList}</ul></div>` : ""}
+      `;
+
+      const copyBtn = document.getElementById("copyBtn");
+      copyBtn.addEventListener("click", async () => {
+        if (!parsed.primary_code) return;
+        try {
+          await navigator.clipboard.writeText(parsed.primary_code);
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => { copyBtn.textContent = "Copy primary code"; }, 1200);
+        } catch (err) {
+          copyBtn.textContent = "Copy failed";
+          setTimeout(() => { copyBtn.textContent = "Copy primary code"; }, 1200);
+        }
+      });
     }
 
     async function suggest() {
       const note = document.getElementById("note").value.trim();
       const top_k = Number(document.getElementById("topk").value || 10);
-      const status = document.getElementById("status");
       const err = document.getElementById("err");
-      const cands = document.getElementById("cands");
-      const llm = document.getElementById("llm");
 
       err.textContent = "";
-      cands.innerHTML = "";
-      llm.textContent = "";
-      if (!note) { err.textContent = "Not boş olamaz."; return; }
+      err.classList.add("hidden");
 
-      status.textContent = "İstek gönderiliyor...";
+      if (!note) {
+        err.textContent = "Doctor note cannot be empty.";
+        err.classList.remove("hidden");
+        return;
+      }
+
+      setLoading(true);
       try {
         const res = await fetch(`${API}/icd-suggest`, {
           method: "POST",
@@ -77,36 +411,28 @@
 
         if (!res.ok) {
           const t = await res.text();
-          throw new Error(`API hata: ${res.status} ${t}`);
+          throw new Error(`API error: ${res.status} ${t}`);
         }
 
         const data = await res.json();
-
-        // candidates table
-        const rows = (data.candidates || []).map(c =>
-          `<tr>
-            <td><code>${escapeHtml(c.code)}</code></td>
-            <td>${escapeHtml(c.title)}</td>
-            <td>${(c.score ?? 0).toFixed(3)}</td>
-          </tr>`
-        ).join("");
-
-        cands.innerHTML = `
-          <table>
-            <thead><tr><th>Kod</th><th>Başlık</th><th>Skor</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        `;
-
-        llm.textContent = data.llm || "";
-        status.textContent = "Tamam ✅";
+        renderCandidates(data.candidates || []);
+        renderFinal(data.llm || "");
       } catch (e) {
         err.textContent = e.message || String(e);
-        status.textContent = "";
+        err.classList.remove("hidden");
+      } finally {
+        setLoading(false);
       }
     }
 
     document.getElementById("send").addEventListener("click", suggest);
+
+    const topk = document.getElementById("topk");
+    const topkValue = document.getElementById("topkValue");
+    topkValue.textContent = topk.value;
+    topk.addEventListener("input", () => {
+      topkValue.textContent = topk.value;
+    });
   </script>
 </body>
 </html>
