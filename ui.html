@@ -195,6 +195,47 @@
       letter-spacing: 0.02em;
     }
 
+    .final-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .progress {
+      width: 100%;
+      height: 10px;
+      background: #efe7de;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #1b6a5e, #2b8a7c);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fbf7f2;
+    }
+
+    details summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--accent-2);
+      list-style: none;
+    }
+
+    details summary::-webkit-details-marker {
+      display: none;
+    }
+
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -339,45 +380,91 @@
       `;
     }
 
+    function extractJsonFromText(text) {
+      const raw = text || "";
+      const fencedMatch = raw.match(/```json\s*([\s\S]*?)```/i);
+      if (fencedMatch && fencedMatch[1]) {
+        const jsonText = fencedMatch[1].trim();
+        try {
+          return { data: JSON.parse(jsonText), raw, jsonText };
+        } catch (err) {
+          return { data: null, raw, jsonText };
+        }
+      }
+
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const jsonText = raw.slice(firstBrace, lastBrace + 1);
+        try {
+          return { data: JSON.parse(jsonText), raw, jsonText };
+        } catch (err) {
+          return { data: null, raw, jsonText };
+        }
+      }
+
+      return { data: null, raw, jsonText: "" };
+    }
+
     function renderFinal(llmText) {
       const final = document.getElementById("final");
       let parsed = null;
+      let rawJson = "";
+      let rawText = "";
 
-      try {
-        parsed = JSON.parse(llmText);
-      } catch (err) {
-        parsed = null;
+      if (llmText && typeof llmText === "object") {
+        parsed = llmText;
+        rawJson = JSON.stringify(parsed, null, 2);
+      } else {
+        const result = extractJsonFromText(String(llmText || ""));
+        parsed = result.data && typeof result.data === "object" ? result.data : null;
+        rawJson = result.jsonText && result.jsonText.trim()
+          ? result.jsonText.trim()
+          : parsed ? JSON.stringify(parsed, null, 2) : "";
+        rawText = result.raw;
       }
 
-      if (!parsed || typeof parsed !== "object") {
+      if (!parsed) {
         final.innerHTML = `
-          <div class="muted">Raw model output</div>
-          <pre style="white-space:pre-wrap; background:#fbf7f2; padding:12px; border-radius:10px; border:1px solid var(--border);">${escapeHtml(llmText || "")}</pre>
+          <div class="muted">Could not parse model response.</div>
+          <details>
+            <summary>Show raw response</summary>
+            <pre style="white-space:pre-wrap; padding:12px; border-radius:10px; border:1px solid var(--border); background:#fff;">${escapeHtml(rawText)}</pre>
+          </details>
         `;
         return;
       }
 
-      const primary = escapeHtml(parsed.primary_code || "-");
-      const confidence = parsed.confidence != null ? Number(parsed.confidence).toFixed(2) : "-";
-      const reason = escapeHtml(parsed.reason || "");
-      const alternatives = Array.isArray(parsed.alternatives) ? parsed.alternatives : [];
-      const altList = alternatives.map((alt) => `
-        <li><code>${escapeHtml(alt.code || "")}</code> — ${escapeHtml(alt.why || "")}</li>
-      `).join("");
+      const primaryCode = parsed.primary_code || "";
+      const primary = escapeHtml(primaryCode || "-");
+      const confidenceRaw = parsed.confidence != null ? Number(parsed.confidence) : null;
+      const confidencePct = confidenceRaw != null && !Number.isNaN(confidenceRaw)
+        ? Math.max(0, Math.min(100, Math.round(confidenceRaw * 100)))
+        : null;
+      const explanationText = typeof parsed.reason === "string" ? parsed.reason.trim() : "";
 
       final.innerHTML = `
         <div class="code">${primary}</div>
-        <div class="badge">Confidence: ${confidence}</div>
-        <div>${reason}</div>
-        <button id="copyBtn" class="ghost" type="button">Copy primary code</button>
-        ${altList ? `<div><strong>Alternatives</strong><ul>${altList}</ul></div>` : ""}
+        <div class="badge">Confidence: ${confidencePct != null ? confidencePct + "%" : "-"}</div>
+        <div class="progress" aria-hidden="true">
+          <div class="progress-bar" style="width: ${confidencePct != null ? confidencePct : 0}%;"></div>
+        </div>
+        <div class="muted">Why this code was suggested</div>
+        <div>${escapeHtml(explanationText)}</div>
+        <div class="final-actions">
+          <button id="copyBtn" class="ghost" type="button">Copy primary code</button>
+        </div>
+        <details>
+          <summary>Show raw JSON</summary>
+          <pre style="white-space:pre-wrap; padding:12px; border-radius:10px; border:1px solid var(--border); background:#fff;">${escapeHtml(rawJson)}</pre>
+        </details>
       `;
 
       const copyBtn = document.getElementById("copyBtn");
       copyBtn.addEventListener("click", async () => {
-        if (!parsed.primary_code) return;
+        if (!primaryCode) return;
         try {
-          await navigator.clipboard.writeText(parsed.primary_code);
+          await navigator.clipboard.writeText(primaryCode);
           copyBtn.textContent = "Copied!";
           setTimeout(() => { copyBtn.textContent = "Copy primary code"; }, 1200);
         } catch (err) {
